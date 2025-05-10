@@ -1,7 +1,6 @@
-#!/bin/bash
 ##
 ## SYNOPSIS
-##    test_dv_ls
+##    test_dv_ls.ps1
 ##
 ## DESCRIPTION
 ##    CS145 test script for project2.
@@ -9,96 +8,111 @@
 ##    the routes obtained are correct (given the correct routes in the JSON file)
 
 # parse command line arguments
-if [ $# -eq 0 ]; then
-  ROUTER="BOTH"
-elif [[ ( $# -eq 1 ) && ( $1 == "DV" || $1 == "LS" || $1 == "BOTH" ) ]]; then
-  ROUTER=$1
-else
-  printf "Usage: $0 [DV|LS|BOTH]\n"
-  exit 1
-fi
+param(
+    [Parameter(Position=0)]
+    [ValidateSet("DV", "LS", "BOTH")]
+    [string] $ROUTER = "BOTH"
+)
 
-numCorrect=0
-testNum=1
-SUCCESS_MESSAGE="SUCCESS: All Routes correct!"
-FAILURE_MESSAGE="FAILURE: Not all routes are correct"
-TIMEOUT_PER_TEST=60
-WORKSPACE=~/tmp/
-RESULT_FILE=test_result
+$numCorrect = 0
+$testNum = 1
+$SUCCESS_MESSAGE = "SUCCESS: All Routes correct!"
+$FAILURE_MESSAGE = "FAILURE: Not all routes are correct"
+$TIMEOUT_PER_TEST = 60
+$WORKSPACE = "$env:TEMP\network_test"
+$RESULT_FILE = "test_result.txt"
 
 # testing functions
 
 # $1 = DV|LS, $2 = network simulation file, $3 = print separator (no if 0, yes otherwise)
-function test {
-  timeOut=0
-  printf "\n$testNum. Testing $2 with $1router\n"
-  ((testNum++))
-  timeout $TIMEOUT_PER_TEST python network.py $2 $1 | tee $RESULT_FILE
-  if [ ${PIPESTATUS[0]} -eq 124 ]; then
-    timeOut=1
-    printf "TIMED OUT\n"
-  fi
-  resultTail=$(tail -n1 $RESULT_FILE)
-  rm -f $RESULT_FILE
-  if [[ $resultTail == $SUCCESS_MESSAGE ]]; then
-    ((numCorrect++))
-  elif [[ $resultTail != $FAILURE_MESSAGE && $timeOut -eq 0 ]]; then
-    printf "Fatal error: failed to parse test result message\n"
-    rm -rf $WORKSPACE
-    exit 1
-  fi
-  if [ $3 -ne 0 ]; then
-    printf "________________________________________"
-  fi
-  printf "\n"
+function Test-Router {
+    param(
+        [string] $routerType,
+        [string] $networkFile,
+        [int] $printSeparator
+    )
+
+    $timeOut = 0
+    Write-Host "`n$testNum. Testing $networkFile with $routerType`router"
+    $script:testNum++
+
+    # Using Start-Process with -Wait and -TimeoutSec for timeout functionality
+    $process = Start-Process -FilePath python -ArgumentList "network.py", $networkFile, $routerType -NoNewWindow -PassThru -RedirectStandardOutput "$WORKSPACE\$RESULT_FILE"
+    $process | Wait-Process -Timeout $TIMEOUT_PER_TEST -ErrorAction SilentlyContinue
+
+    if (-not $process.HasExited) {
+        $timeOut = 1
+        $process | Stop-Process -Force
+        Write-Host "TIMED OUT"
+    }
+
+    $resultTail = Get-Content -Path "$WORKSPACE\$RESULT_FILE" -Tail 1 -ErrorAction SilentlyContinue
+    Remove-Item -Path $RESULT_FILE -Force -ErrorAction SilentlyContinue
+
+    if ($resultTail -eq $SUCCESS_MESSAGE) {
+        $script:numCorrect++
+    } elseif ($resultTail -ne $FAILURE_MESSAGE -and $timeOut -eq 0) {
+        Write-Host "Fatal error: failed to parse test result message"
+        Remove-Item -Path $WORKSPACE -Recurse -Force -ErrorAction SilentlyContinue
+        exit 1
+    }
+
+    if ($printSeparator -ne 0) {
+        Write-Host "________________________________________"
+    }
+    Write-Host ""
 }
 
 # $1 = DV|LS
-function testAll {
-  if [[ $1 == DV ]]; then
-    testMessage="Testing Distance Vector routing implementation"
-  else
-    testMessage="Testing Link State routing implementation"
-  fi
-  printf "================================================================\n"
-  printf "$testMessage\n"
-  printf "================================================================\n"
+function Test-AllNetworks {
+    param(
+        [string] $routerType
+    )
 
-  jsonFiles=$( find $(pwd) -maxdepth 1 -name "*.json" )
-  echo $jsonFiles
-  numJsonFiles=$( echo $jsonFiles | wc -w )
-  for jsonFile in $jsonFiles; do
-    ((numJsonFiles--))
-    test $1 $jsonFile $( if [ $numJsonFiles -eq 0 ]; then echo -n 0; else echo -n 1; fi )
-  done
+    if ($routerType -eq "DV") {
+        $testMessage = "Testing Distance Vector routing implementation"
+    } else {
+        $testMessage = "Testing Link State routing implementation"
+    }
+
+    Write-Host "================================================================"
+    Write-Host $testMessage
+    Write-Host "================================================================"
+
+    $jsonFiles = Get-ChildItem -Path "$PSScriptRoot" -Filter "*.json" -Recurse
+    $numJsonFiles = $jsonFiles.Count
+
+    foreach ($jsonFile in $jsonFiles) {
+        $numJsonFiles--
+        $printSeparator = if ($numJsonFiles -eq 0) { 0 } else { 1 }
+        Test-Router $routerType $jsonFile.FullName $printSeparator
+    }
 }
 
 ####################################################
 # RUN TESTS
 ####################################################
 
-trap "rm -rf $WORKSPACE; exit 1" SIGINT
+# Cleanup on script termination
+try {
+    Remove-Item -Path $WORKSPACE -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -Path $WORKSPACE -ItemType Directory -Force | Out-Null
 
-rm -rf $WORKSPACE
-mkdir $WORKSPACE
-
-if [ $ROUTER == "DV" ]; then
-  testAll DV
-
-elif [ $ROUTER == "LS" ]; then
-  testAll LS
-
-else
-  testAll DV
-  testAll LS
-
-fi
-
-rm -rf $WORKSPACE
+    if ($ROUTER -eq "DV") {
+        Test-AllNetworks "DV"
+    } elseif ($ROUTER -eq "LS") {
+        Test-AllNetworks "LS"
+    } else {
+        Test-AllNetworks "DV"
+        Test-AllNetworks "LS"
+    }
+} finally {
+    Remove-Item -Path $WORKSPACE -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 #####################################################
 # Summary Results
 #####################################################
 
-printf "================================================================\n\n"
-printf "TESTS PASSED: $numCorrect/$((testNum - 1))\n"
+Write-Host "================================================================`n"
+Write-Host "TESTS PASSED: $numCorrect/$($testNum - 1)"
