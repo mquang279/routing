@@ -19,7 +19,7 @@ class LSA:
         return json.dumps({
             "advertising_router": self.advertising_router,
             "seq_num": self.seq_num,
-            "data": self.links
+            "links": self.links
         })
 
 class LSDB:
@@ -48,16 +48,17 @@ class LSrouter(Router):
         self.lsa = LSA(self.addr, 0)
         pass
 
-    def convert_json_to_lsa(str):
+    def convert_json_to_lsa(self, str):
         data = json.loads(str)
-        return LSA(
+        lsa = LSA(
             data["advertising_router"],
             data["seq_num"],
-            data["data"]
         )
+        lsa.links = data["links"]
+        return lsa
     
     def broadcast(self, packet):
-        for neighbor_port, link in self.links.items():
+        for neighbor_port, link in self.links.items():  
             if link.e1.isupper() and link.e2.isupper():
                 self.send(neighbor_port, packet)
 
@@ -77,7 +78,7 @@ class LSrouter(Router):
             #   broadcast the packet to other neighbors
             recv_lsa = self.convert_json_to_lsa(packet.content)
             for router_id, info in recv_lsa.links.items():
-                self.lsa[router_id] = info
+                self.lsa.links[router_id] = info
             self.broadcast(packet)
             pass
 
