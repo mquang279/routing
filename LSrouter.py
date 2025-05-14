@@ -57,9 +57,9 @@ class LSrouter(Router):
         lsa.links = data["links"]
         return lsa
     
-    def broadcast(self, packet):
+    def broadcast(self, packet, sender_router_addr):
         for neighbor_port, link in self.links.items():  
-            if link.e1.isupper() and link.e2.isupper():
+            if link.e1.isupper() and link.e2.isupper() and link.e1 != sender_router_addr and link.e2 != sender_router_addr:
                 self.send(neighbor_port, packet)
 
     def handle_packet(self, port, packet):
@@ -77,9 +77,10 @@ class LSrouter(Router):
             #   update the forwarding table
             #   broadcast the packet to other neighbors
             recv_lsa = self.convert_json_to_lsa(packet.content)
-            for router_id, info in recv_lsa.links.items():
-                self.lsa.links[router_id] = info
-            self.broadcast(packet)
+            for router_addr, info in recv_lsa.links.items():
+                if router_addr != self.addr:
+                    self.lsa.links[router_addr] = info
+            self.broadcast(packet, packet.src_addr)
             pass
 
     def handle_new_link(self, port, endpoint, cost):
@@ -89,7 +90,7 @@ class LSrouter(Router):
         #   broadcast the new link state of this router to all neighbors
         self.lsa.links[endpoint] = [cost, port]
         packet = Packet(Packet.ROUTING, self.addr, endpoint, self.lsa.to_json())
-        self.broadcast(packet)
+        self.broadcast(packet, "")
         pass
 
     def handle_remove_link(self, port):
