@@ -5,6 +5,28 @@
 #####################################################
 
 from router import Router
+from packet import Packet
+import json
+
+class LSA:
+    def __init__(self, advertising_router, seq_num):
+        self.advertising_router = advertising_router
+        self.seq_num = seq_num
+        # Chắc phải sửa key thành router1_id và router2_id {routerId: [Cost, Port]}
+        self.links = {}
+    
+    def to_json(self):
+        return json.dumps({
+            "advertising_router": self.advertising_router,
+            "seq_num": self.seq_num,
+            "data": self.links
+        })
+
+class LSDB:
+    # Này chưa biết thiết kế như nào
+    def __init__(self):
+        pass
+    
 
 
 class LSrouter(Router):
@@ -21,7 +43,23 @@ class LSrouter(Router):
         self.last_time = 0
         # TODO
         #   add your own class fields and initialization code here
+        self.routing_table = {}
+        self.link_state_db = {}
+        self.lsa = LSA(self.addr, 0)
         pass
+
+    def convert_json_to_lsa(str):
+        data = json.loads(str)
+        return LSA(
+            data["advertising_router"],
+            data["seq_num"],
+            data["data"]
+        )
+    
+    def broadcast(self, packet):
+        for neighbor_port, link in self.links.items():
+            if link.e1.isupper() and link.e2.isupper():
+                self.send(neighbor_port, packet)
 
     def handle_packet(self, port, packet):
         """Process incoming packet."""
@@ -37,6 +75,10 @@ class LSrouter(Router):
             #   update the local copy of the link state
             #   update the forwarding table
             #   broadcast the packet to other neighbors
+            recv_lsa = self.convert_json_to_lsa(packet.content)
+            for router_id, info in recv_lsa.links.items():
+                self.lsa[router_id] = info
+            self.broadcast(packet)
             pass
 
     def handle_new_link(self, port, endpoint, cost):
@@ -44,6 +86,9 @@ class LSrouter(Router):
         # TODO
         #   update local data structures and forwarding table
         #   broadcast the new link state of this router to all neighbors
+        self.lsa.links[endpoint] = [cost, port]
+        packet = Packet(Packet.ROUTING, self.addr, endpoint, self.lsa.to_json())
+        self.broadcast(packet)
         pass
 
     def handle_remove_link(self, port):
@@ -65,4 +110,4 @@ class LSrouter(Router):
         """Representation for debugging in the network visualizer."""
         # TODO
         #   NOTE This method is for your own convenience and will not be graded
-        return f"LSrouter(addr={self.addr})"
+        return f"LSA: {self.lsa.to_json()}"
