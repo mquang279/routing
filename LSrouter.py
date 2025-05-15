@@ -86,7 +86,7 @@ class LSrouter(Router):
                 if recv_lsa.advertising_router not in self.link_state_db:
                     self.link_state_db[recv_lsa.advertising_router] = []
                 self.link_state_db[recv_lsa.advertising_router].append((endpoint, links[0], links[1]))
-
+            self.link_state_db[recv_lsa.advertising_router] = list(set(self.link_state_db[recv_lsa.advertising_router]))
             self.broadcast(packet, packet.src_addr)
             pass
 
