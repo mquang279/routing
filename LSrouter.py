@@ -22,13 +22,6 @@ class LSA:
             "links": self.links
         })
 
-class LSDB:
-    # Này chưa biết thiết kế như nào
-    def __init__(self):
-        pass
-    
-
-
 class LSrouter(Router):
     """Link state routing protocol implementation.
 
@@ -44,7 +37,13 @@ class LSrouter(Router):
         # TODO
         #   add your own class fields and initialization code here
         self.routing_table = {}
+        # Cấu trúc của LSDB sẽ như này
+        # Key sẽ là advertising_router_addr
+        # Value sẽ là tuple (endpoint, cost, port)
+        # T nghĩ nó sẽ giống danh sách cạnh nên implement như này
         self.link_state_db = {}
+        self.seq_lsa = {}
+        self.link_state_db[self.addr] = []
         self.lsa = LSA(self.addr, 0)
         pass
 
@@ -77,9 +76,17 @@ class LSrouter(Router):
             #   update the forwarding table
             #   broadcast the packet to other neighbors
             recv_lsa = self.convert_json_to_lsa(packet.content)
-            for router_addr, info in recv_lsa.links.items():
-                if router_addr != self.addr:
-                    self.lsa.links[router_addr] = info
+            # Kiểm tra seq_num
+            if (recv_lsa.advertising_router in self.seq_lsa and recv_lsa.seq_num < self.seq_lsa[recv_lsa.advertising_router]):
+                pass
+            self.seq_lsa[recv_lsa.advertising_router] = recv_lsa.seq_num
+
+            # Này là để update vào LSDB mà có vẻ như nó đang update lặp, chưa handle sẽ sửa sau
+            for endpoint, links in recv_lsa.links.items():
+                if recv_lsa.advertising_router not in self.link_state_db:
+                    self.link_state_db[recv_lsa.advertising_router] = []
+                self.link_state_db[recv_lsa.advertising_router].append((endpoint, links[0], links[1]))
+
             self.broadcast(packet, packet.src_addr)
             pass
 
@@ -89,6 +96,7 @@ class LSrouter(Router):
         #   update local data structures and forwarding table
         #   broadcast the new link state of this router to all neighbors
         self.lsa.links[endpoint] = [cost, port]
+        self.link_state_db[self.addr].append((endpoint, cost, port))
         packet = Packet(Packet.ROUTING, self.addr, endpoint, self.lsa.to_json())
         self.broadcast(packet, "")
         pass
@@ -112,4 +120,4 @@ class LSrouter(Router):
         """Representation for debugging in the network visualizer."""
         # TODO
         #   NOTE This method is for your own convenience and will not be graded
-        return f"LSA: {self.lsa.to_json()}"
+        return f"LSDB: {self.link_state_db}"
