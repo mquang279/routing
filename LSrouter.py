@@ -7,6 +7,7 @@
 from router import Router
 from packet import Packet
 import json
+import heapq
 
 class LSA:
     def __init__(self, advertising_router, seq_num):
@@ -44,7 +45,28 @@ class LSrouter(Router):
         self.seq_lsa = {}
         self.link_state_db[self.addr] = []
         self.lsa = LSA(self.addr, 0)
+        self.routing_table = {}
         pass
+
+    def dijkstra(self):
+        pq = []
+        heapq.heappush(pq, (0, (self.addr, self.addr)))
+        visited = set()
+        parent = {}
+        dist = {}
+        while pq:
+            tmp = heapq.heappop(pq)
+            curr_addr = tmp[1][0]
+            curr_cost = tmp[0]
+            curr_parrent = tmp[1][1]
+            if curr_addr not in visited:
+                visited.add(curr_addr)
+                dist[curr_addr] = curr_cost
+                parent[curr_addr] = curr_parrent
+                if (curr_addr in self.link_state_db):
+                    for edge in self.link_state_db[curr_addr]:
+                        heapq.heappush(pq, (curr_cost + edge[1], (edge[0], curr_addr)))
+        return dist
 
     def convert_json_to_lsa(self, str):
         data = json.loads(str)
@@ -77,7 +99,7 @@ class LSrouter(Router):
             #   broadcast the packet to other neighbors
             recv_lsa = self.convert_json_to_lsa(packet.content)
             # Kiểm tra seq_num
-            if (recv_lsa.advertising_router in self.seq_lsa and recv_lsa.seq_num < self.seq_lsa[recv_lsa.advertising_router]):
+            if (recv_lsa.advertising_router in self.seq_lsa and recv_lsa.seq_num <= self.seq_lsa[recv_lsa.advertising_router]):
                 pass
             self.seq_lsa[recv_lsa.advertising_router] = recv_lsa.seq_num
 
@@ -120,4 +142,5 @@ class LSrouter(Router):
         """Representation for debugging in the network visualizer."""
         # TODO
         #   NOTE This method is for your own convenience and will not be graded
-        return f"LSDB: {self.link_state_db}"
+        # 
+        return f"Min Cost: {self.dijkstra()}"
