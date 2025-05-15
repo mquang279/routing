@@ -59,6 +59,7 @@ class LSrouter(Router):
         for neighbor_port, link in self.links.items():  
             if link.e1.isupper() and link.e2.isupper() and link.e1 != sender_router_addr and link.e2 != sender_router_addr:
                 self.send(neighbor_port, packet)
+        self.lsa.seq_num = self.lsa.seq_num + 1
 
     def handle_packet(self, port, packet):
         """Process incoming packet."""
