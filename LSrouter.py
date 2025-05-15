@@ -114,6 +114,8 @@ class LSrouter(Router):
             self.last_time = time_ms
             # TODO
             #   broadcast the link state of this router to all neighbors
+            packet = Packet(Packet.ROUTING, self.addr, endpoint, self.lsa.to_json())
+            self.broadcast(packet, "")
             pass
 
     def __repr__(self):
