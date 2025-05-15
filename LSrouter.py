@@ -12,7 +12,6 @@ class LSA:
     def __init__(self, advertising_router, seq_num):
         self.advertising_router = advertising_router
         self.seq_num = seq_num
-        # Chắc phải sửa key thành router1_id và router2_id {routerId: [Cost, Port]}
         self.links = {}
     
     def to_json(self):
