@@ -86,6 +86,7 @@ class LSrouter(Router):
     
     def broadcast(self, sender_router_addr):
         for port, link in self.links.items():  
+            # Kiem tra neu la link den router khac va khong phai link den router da gui goi tin LSA
             if link.e1.isupper() and link.e2.isupper() and link.e1 != sender_router_addr and link.e2 != sender_router_addr:
                 packet = None
                 if link.e1 != self.addr:
@@ -118,10 +119,13 @@ class LSrouter(Router):
             self.seq_lsa[recv_lsa.advertising_router] = recv_lsa.seq_num
 
             # Này là để update vào LSDB mà có vẻ như nó đang update lặp, chưa handle sẽ sửa sau
+            # Dat lai LSDB cua router gui goi tin LSA
             self.link_state_db[recv_lsa.advertising_router] = []
-            for endpoint, links in recv_lsa.links.items():
-                self.link_state_db[recv_lsa.advertising_router].append((endpoint, links[0], links[1]))
-            self.link_state_db[recv_lsa.advertising_router] = list(set(self.link_state_db[recv_lsa.advertising_router]))
+
+            # Duyet qua toan bo cac link trong goi tin LSA
+            for router_id, links in recv_lsa.links.items():
+                self.link_state_db[recv_lsa.advertising_router].append((router_id, links[0], links[1]))
+            # self.link_state_db[recv_lsa.advertising_router] = list(set(self.link_state_db[recv_lsa.advertising_router]))
             self.broadcast(packet.src_addr)
             self.config_routing_table()
             pass
@@ -131,9 +135,12 @@ class LSrouter(Router):
         # TODO
         #   update local data structures and forwarding table
         #   broadcast the new link state of this router to all neighbors
+
+        # Them link moi vao thong tin goi tin lsa
         self.lsa.links[endpoint] = [cost, port]
+        # Them link moi vao LSDB
         self.link_state_db[self.addr].append((endpoint, cost, port))
-        packet = Packet(Packet.ROUTING, self.addr, endpoint, self.lsa.to_json())
+        # Broadcast goi tin LSA
         self.broadcast("")
         self.config_routing_table()
         pass
