@@ -84,10 +84,15 @@ class LSrouter(Router):
         lsa.links = data["links"]
         return lsa
     
-    def broadcast(self, packet, sender_router_addr):
-        for neighbor_port, link in self.links.items():  
+    def broadcast(self, sender_router_addr):
+        for port, link in self.links.items():  
             if link.e1.isupper() and link.e2.isupper() and link.e1 != sender_router_addr and link.e2 != sender_router_addr:
-                self.send(neighbor_port, packet)
+                packet = None
+                if link.e1 != self.addr:
+                    packet = Packet(Packet.ROUTING, self.addr, link.e1, self.lsa.to_json())
+                else:
+                    packet = Packet(Packet.ROUTING, self.addr, link.e2, self.lsa.to_json())
+                self.send(port, packet)
         self.lsa.seq_num = self.lsa.seq_num + 1
 
     def handle_packet(self, port, packet):
@@ -118,7 +123,7 @@ class LSrouter(Router):
                     self.link_state_db[recv_lsa.advertising_router] = []
                 self.link_state_db[recv_lsa.advertising_router].append((endpoint, links[0], links[1]))
             self.link_state_db[recv_lsa.advertising_router] = list(set(self.link_state_db[recv_lsa.advertising_router]))
-            self.broadcast(packet, packet.src_addr)
+            self.broadcast(packet.src_addr)
             self.config_routing_table()
             pass
 
@@ -130,7 +135,7 @@ class LSrouter(Router):
         self.lsa.links[endpoint] = [cost, port]
         self.link_state_db[self.addr].append((endpoint, cost, port))
         packet = Packet(Packet.ROUTING, self.addr, endpoint, self.lsa.to_json())
-        self.broadcast(packet, "")
+        self.broadcast("")
         self.config_routing_table()
         pass
 
@@ -148,6 +153,7 @@ class LSrouter(Router):
             self.last_time = time_ms
             # TODO
             #   broadcast the link state of this router to all neighbors
+            self.broadcast("")
             pass
 
     def __repr__(self):
