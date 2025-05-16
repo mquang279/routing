@@ -91,15 +91,14 @@ class LSrouter(Router):
     
     def broadcast(self, packet, sender_router_addr):
         for router_addr, link in self.lsa.links.items():  
-            # Kiểm tra nếu là link đến router và link này không phải là link đến router đã gửi gói tin LSA
+            if not router_addr.isupper() or router_addr == sender_router_addr:
+                continue
             port = link[1]
-            if router_addr.isupper() and router_addr != sender_router_addr:
-                if packet is not None:
-                    self.send(link[1], packet)
-                    continue
-                packet = Packet(Packet.ROUTING, self.addr, router_addr, self.lsa.to_json())
-                self.send(port, packet)
-        self.lsa.seq_num = self.lsa.seq_num + 1
+            if packet is not None:
+                self.send(link[1], packet)
+                continue
+            packet = Packet(Packet.ROUTING, self.addr, router_addr, self.lsa.to_json())
+            self.send(port, packet)
 
     def handle_packet(self, port, packet):
         """Process incoming packet."""
@@ -148,6 +147,7 @@ class LSrouter(Router):
         # Broadcast goi tin LSA
         self.broadcast(None, None)
         self.config_routing_table()
+        self.lsa.seq_num = self.lsa.seq_num + 1
         pass
 
     def handle_remove_link(self, port):
@@ -163,6 +163,7 @@ class LSrouter(Router):
                 break
         self.config_routing_table()
         self.broadcast(None, None)
+        self.lsa.seq_num = self.lsa.seq_num + 1
         pass
 
     def handle_time(self, time_ms):
