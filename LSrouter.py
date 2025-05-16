@@ -118,9 +118,8 @@ class LSrouter(Router):
             self.seq_lsa[recv_lsa.advertising_router] = recv_lsa.seq_num
 
             # Này là để update vào LSDB mà có vẻ như nó đang update lặp, chưa handle sẽ sửa sau
+            self.link_state_db[recv_lsa.advertising_router] = []
             for endpoint, links in recv_lsa.links.items():
-                if recv_lsa.advertising_router not in self.link_state_db:
-                    self.link_state_db[recv_lsa.advertising_router] = []
                 self.link_state_db[recv_lsa.advertising_router].append((endpoint, links[0], links[1]))
             self.link_state_db[recv_lsa.advertising_router] = list(set(self.link_state_db[recv_lsa.advertising_router]))
             self.broadcast(packet.src_addr)
@@ -145,6 +144,13 @@ class LSrouter(Router):
         #   update local data structures and forwarding table
         #   broadcast the new link state of this router to all neighbors
         #   
+        for router_addr, link in self.lsa.links.items():
+            if link[1] == port:
+                self.link_state_db[self.addr].remove((router_addr, link[0], port))
+                del self.lsa.links[router_addr]
+                break
+        self.config_routing_table()
+        self.broadcast("")
         pass
 
     def handle_time(self, time_ms):
