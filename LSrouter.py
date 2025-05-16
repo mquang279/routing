@@ -84,10 +84,14 @@ class LSrouter(Router):
         lsa.links = data["links"]
         return lsa
     
-    def broadcast(self, sender_router_addr):
+    def broadcast(self, packet, sender_router_addr):
         for port, link in self.links.items():  
             # Kiem tra neu la link den router khac va khong phai link den router da gui goi tin LSA
             if link.e1.isupper() and link.e2.isupper() and link.e1 != sender_router_addr and link.e2 != sender_router_addr:
+                if packet is not None:
+                    self.send(port, packet)
+                    continue
+
                 packet = None
                 if link.e1 != self.addr:
                     packet = Packet(Packet.ROUTING, self.addr, link.e1, self.lsa.to_json())
@@ -126,7 +130,7 @@ class LSrouter(Router):
             for router_id, links in recv_lsa.links.items():
                 self.link_state_db[recv_lsa.advertising_router].append((router_id, links[0], links[1]))
             # self.link_state_db[recv_lsa.advertising_router] = list(set(self.link_state_db[recv_lsa.advertising_router]))
-            self.broadcast(packet.src_addr)
+            self.broadcast(packet, packet.src_addr)
             self.config_routing_table()
             pass
 
@@ -141,7 +145,7 @@ class LSrouter(Router):
         # Them link moi vao LSDB
         self.link_state_db[self.addr].append((endpoint, cost, port))
         # Broadcast goi tin LSA
-        self.broadcast("")
+        self.broadcast(None, "")
         self.config_routing_table()
         pass
 
@@ -157,7 +161,7 @@ class LSrouter(Router):
                 del self.lsa.links[router_addr]
                 break
         self.config_routing_table()
-        self.broadcast("")
+        self.broadcast(None, "")
         pass
 
     def handle_time(self, time_ms):
@@ -166,7 +170,7 @@ class LSrouter(Router):
             self.last_time = time_ms
             # TODO
             #   broadcast the link state of this router to all neighbors
-            self.broadcast("")
+            self.broadcast(None, "")
             pass
 
     def __repr__(self):
