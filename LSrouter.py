@@ -35,15 +35,20 @@ class LSrouter(Router):
         self.last_time = 0
         # TODO
         #   add your own class fields and initialization code here
-        self.routing_table = {}
-        # Cấu trúc của LSDB sẽ như này
-        # Key sẽ là advertising_router_addr
-        # Value sẽ là tuple (endpoint, cost, port)
-        # T nghĩ nó sẽ giống danh sách cạnh nên implement như này
+
+        # Key: advertising_router_addr | Value: (neighbor_router_addr, cost, port)
         self.link_state_db = {}
+        
+        # Key: advertising_router_addr | Value: seq_num
         self.seq_lsa = {}
+
+        # Key: advertising_router_addr | Value: links connected with advertising router
+        self.link_state_db = {}
         self.link_state_db[self.addr] = []
+
         self.lsa = LSA(self.addr, 0)
+
+        # Key: router_addr | Value: port
         self.routing_table = {}
         
     def config_routing_table(self):
@@ -53,10 +58,10 @@ class LSrouter(Router):
         parent = {}
         dist = {}
         while pq:
-            tmp = heapq.heappop(pq)
-            curr_addr = tmp[1][0]
-            curr_cost = tmp[0]
-            curr_parrent = tmp[1][1]
+            currentLink = heapq.heappop(pq)
+            curr_addr = currentLink[1][0]
+            curr_cost = currentLink[0]
+            curr_parrent = currentLink[1][1]
             if curr_addr not in visited:
                 visited.add(curr_addr)
                 dist[curr_addr] = curr_cost
@@ -64,7 +69,7 @@ class LSrouter(Router):
                 if (curr_addr in self.link_state_db):
                     for edge in self.link_state_db[curr_addr]:
                         heapq.heappush(pq, (curr_cost + edge[1], (edge[0], curr_addr)))
-                        
+
         self.routing_table = {}
         for router_addr in visited:
             if router_addr == self.addr:
@@ -85,18 +90,14 @@ class LSrouter(Router):
         return lsa
     
     def broadcast(self, packet, sender_router_addr):
-        for port, link in self.links.items():  
-            # Kiem tra neu la link den router khac va khong phai link den router da gui goi tin LSA
-            if link.e1.isupper() and link.e2.isupper() and link.e1 != sender_router_addr and link.e2 != sender_router_addr:
+        for router_addr, link in self.lsa.links.items():  
+            # Kiểm tra nếu là link đến router và link này không phải là link đến router đã gửi gói tin LSA
+            port = link[1]
+            if router_addr.isupper() and router_addr != sender_router_addr:
                 if packet is not None:
-                    self.send(port, packet)
+                    self.send(link[1], packet)
                     continue
-
-                packet = None
-                if link.e1 != self.addr:
-                    packet = Packet(Packet.ROUTING, self.addr, link.e1, self.lsa.to_json())
-                else:
-                    packet = Packet(Packet.ROUTING, self.addr, link.e2, self.lsa.to_json())
+                packet = Packet(Packet.ROUTING, self.addr, router_addr, self.lsa.to_json())
                 self.send(port, packet)
         self.lsa.seq_num = self.lsa.seq_num + 1
 
@@ -145,7 +146,7 @@ class LSrouter(Router):
         # Them link moi vao LSDB
         self.link_state_db[self.addr].append((endpoint, cost, port))
         # Broadcast goi tin LSA
-        self.broadcast(None, "")
+        self.broadcast(None, None)
         self.config_routing_table()
         pass
 
@@ -161,7 +162,7 @@ class LSrouter(Router):
                 del self.lsa.links[router_addr]
                 break
         self.config_routing_table()
-        self.broadcast(None, "")
+        self.broadcast(None, None)
         pass
 
     def handle_time(self, time_ms):
@@ -170,7 +171,7 @@ class LSrouter(Router):
             self.last_time = time_ms
             # TODO
             #   broadcast the link state of this router to all neighbors
-            self.broadcast(None, "")
+            self.broadcast(None, None)
             pass
 
     def __repr__(self):
@@ -179,4 +180,4 @@ class LSrouter(Router):
         #   NOTE This method is for your own convenience and will not be graded
         # 
         self.config_routing_table()
-        return f"Routing Table: {self.routing_table}, LSA: {self.lsa.to_json()}"
+        return f"Routing Table: \n{self.routing_table},\nLSA: \n{self.lsa.to_json()}"
