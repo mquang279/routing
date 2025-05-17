@@ -95,8 +95,11 @@ class LSrouter(Router):
                 continue
             port = link[1]
             if packet is not None:
-                self.send(link[1], packet)
+                packet.src_addr = self.addr
+                packet.dst_addr = router_addr
+                self.send(port, packet)
                 continue
+
             packet = Packet(Packet.ROUTING, self.addr, router_addr, self.lsa.to_json())
             self.send(port, packet)
 
