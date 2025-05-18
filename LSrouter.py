@@ -125,14 +125,11 @@ class LSrouter(Router):
                 return
             self.seq_lsa[recv_lsa.advertising_router] = recv_lsa.seq_num
 
-            # Này là để update vào LSDB mà có vẻ như nó đang update lặp, chưa handle sẽ sửa sau
             # Dat lai LSDB cua router gui goi tin LSA
-            self.link_state_db[recv_lsa.advertising_router] = []
-
-            # Duyet qua toan bo cac link trong goi tin LSA
-            for router_id, links in recv_lsa.links.items():
-                self.link_state_db[recv_lsa.advertising_router].append((router_id, links[0], links[1]))
-            # self.link_state_db[recv_lsa.advertising_router] = list(set(self.link_state_db[recv_lsa.advertising_router]))
+            self.link_state_db[recv_lsa.advertising_router] = [
+                (router_id, links[0], links[1])
+                for router_id, links in recv_lsa.links.items()
+            ]
             self.broadcast(packet, packet.src_addr)
             self.config_routing_table()
             pass
