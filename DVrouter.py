@@ -74,7 +74,7 @@ class DVrouter(Router):
             # Hint: this is a normal data packet
             # If the forwarding table contains packet.dst_addr
             #   send packet based on forwarding table, e.g., self.send(port, packet)
-            if (packet.dst_addr in self.routing_table):
+            if packet.dst_addr in self.routing_table and self.routing_table[packet.dst_addr][0] != 9999 and self.routing_table[packet.dst_addr][1] != 0:
                 self.send(self.routing_table[packet.dst_addr][1], packet)
             pass
         else:
