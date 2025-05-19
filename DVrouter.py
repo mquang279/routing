@@ -45,14 +45,24 @@ class DVrouter(Router):
         neighbor_DV = self.convert_json_to_routing_table(packet.content)
         DV_router_addr = packet.src_addr
         updated = False
-        base_dist = self.routing_table[DV_router_addr][0]        
+        
+        base_dist = self.routing_table[DV_router_addr][0]
+        sender_port = self.routing_table[DV_router_addr][1]
+        
         for router_addr, link in neighbor_DV.items():
-            if (router_addr == self.addr):
-                continue
-            new_cost = link[0] + base_dist
-            if (router_addr not in self.routing_table or new_cost < self.routing_table[router_addr][0]):
-                self.routing_table[router_addr] = (new_cost, self.routing_table[DV_router_addr][1])
-                updated = True
+            if router_addr == self.addr:
+                continue 
+            
+            if link[0] == 9999:
+                if router_addr in self.routing_table and self.routing_table[router_addr][1] == sender_port:
+                    self.routing_table[router_addr] = (9999, -1)
+                    updated = True
+            else:
+                new_cost = link[0] + base_dist
+                if (router_addr not in self.routing_table or new_cost < self.routing_table[router_addr][0] or self.routing_table[router_addr][1] == sender_port):
+                    self.routing_table[router_addr] = (new_cost, sender_port)
+                    updated = True
+        
         if updated:
             self.broadcast(DV_router_addr)
         return
@@ -89,15 +99,15 @@ class DVrouter(Router):
 
     def handle_remove_link(self, port):
         """Handle removed link."""
-        # TODO
-        #   update the distance vector of this router
-        #   update the forwarding table
-        #   broadcast the distance vector of this router to neighbors
-        for router_addr, link in self.routing_table.items():
+        # Find all routes that use this port and mark them as unreachable
+        updated = False
+        for router_addr, link in list(self.routing_table.items()):
             if link[1] == port:
-                del self.routing_table[router_addr]
-        self.broadcast(None)
-        pass
+                self.routing_table[router_addr] = (9999, -1)
+                updated = True
+        
+        if updated:
+            self.broadcast(None)
 
     def handle_time(self, time_ms):
         """Handle current time."""
