@@ -37,9 +37,6 @@ class LSrouter(Router):
         # TODO
         #   add your own class fields and initialization code here
 
-        # Key: advertising_router_addr | Value: (neighbor_router_addr, cost, port)
-        self.link_state_db = {}
-        
         # Key: advertising_router_addr | Value: seq_num
         self.seq_lsa = {}
 
